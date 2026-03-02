@@ -1,16 +1,20 @@
 import type { CrewData, ProjectJob } from './types'
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
+// ─── Palette ─────────────────────────────────────────────────────────────────
+const C_DARK:  [number, number, number] = [41, 40, 61]    // #29283d
+const C_MUTED: [number, number, number] = [105, 103, 134] // #696786
+const C_LIGHT: [number, number, number] = [233, 232, 234] // #e9e8ea
+const C_WHITE: [number, number, number] = [255, 255, 255] // #ffffff
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const formatDate = (dateStr: string): string => {
   if (!dateStr) return ''
   try {
-    // Handle plain date strings like "2025-10-06"
     if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
       const [y, m, d] = dateStr.split('-')
       return `${d}/${m}/${y}`
     }
-    // Handle ISO datetime strings — display in Paris timezone
     const d = new Date(dateStr)
     return d.toLocaleDateString('fr-FR', {
       day: '2-digit',
@@ -37,7 +41,7 @@ const formatCurrency = (amount: number): string => {
   return amount.toLocaleString('fr-FR', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }) + ' €'
+  }) + ' \u20ac'
 }
 
 const getProjectInfo = (data: CrewData) => {
@@ -57,110 +61,123 @@ const getProjectInfo = (data: CrewData) => {
   }
 }
 
-const NAVY: [number, number, number] = [30, 58, 95]
-const BLUE: [number, number, number] = [74, 144, 217]
-const LIGHT_BLUE: [number, number, number] = [240, 247, 255]
-const GREEN: [number, number, number] = [34, 139, 87]
-const LIGHT_GREEN: [number, number, number] = [240, 252, 246]
-const WHITE: [number, number, number] = [255, 255, 255]
-const DARK: [number, number, number] = [30, 30, 30]
-
-// ─── Liste Technique ────────────────────────────────────────────────────────
+// ─── Liste Technique ─────────────────────────────────────────────────────────
 
 export async function generateListeTechnique(data: CrewData): Promise<void> {
   const { default: jsPDF } = await import('jspdf')
   const { default: autoTable } = await import('jspdf-autotable')
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-  const pageW = doc.internal.pageSize.getWidth()
-  const pageH = doc.internal.pageSize.getHeight()
+  const pageW = doc.internal.pageSize.getWidth()   // 210
+  const pageH = doc.internal.pageSize.getHeight()  // 297
 
   const projectInfo = getProjectInfo(data)
   const totalPersons = Object.values(data).reduce((s, j) => s + j.length, 0)
   const totalDepts = Object.keys(data).length
+  const period = projectInfo
+    ? `${formatDate(projectInfo.startDate)} \u2192 ${formatDate(projectInfo.endDate)}`
+    : ''
 
-  // ── Page header (drawn on first page only via initial draw)
+  const headerH = 52
+  const separatorH = 10
+
+  // ── Page header (first page only — called manually)
   const drawPageHeader = () => {
-    doc.setFillColor(...NAVY)
-    doc.rect(0, 0, pageW, 44, 'F')
+    // Light-gray background block
+    doc.setFillColor(...C_LIGHT)
+    doc.rect(0, 0, pageW, headerH, 'F')
 
-    doc.setTextColor(...WHITE)
-    doc.setFontSize(18)
+    // Left — CREW LIST title + project name
+    doc.setTextColor(...C_DARK)
+    doc.setFontSize(26)
     doc.setFont('helvetica', 'bold')
-    doc.text('LISTE TECHNIQUE', 14, 16)
+    doc.text('CREW LIST', 14, 22)
 
-    doc.setFontSize(12)
+    doc.setFontSize(10.5)
     doc.setFont('helvetica', 'normal')
-    doc.text(projectInfo?.name ?? '', 14, 26)
+    doc.setTextColor(...C_MUTED)
+    doc.text(projectInfo?.name ?? '', 14, 32)
 
-    doc.setFontSize(8)
-    const period =
-      projectInfo
-        ? `${formatDate(projectInfo.startDate)} \u2192 ${formatDate(projectInfo.endDate)}`
-        : ''
-    doc.text(
-      `Production\u00a0: ${projectInfo?.productionName}   \u2022   P\u00e9riode\u00a0: ${period}   \u2022   ${totalPersons} techniciens   \u2022   ${totalDepts} d\u00e9partements`,
-      14,
-      35,
-    )
-    doc.text(
-      `G\u00e9n\u00e9r\u00e9 le ${new Date().toLocaleDateString('fr-FR')}`,
-      pageW - 14,
-      35,
-      { align: 'right' },
-    )
+    doc.setFontSize(7.5)
+    doc.text(`G\u00e9n\u00e9r\u00e9 le ${new Date().toLocaleDateString('fr-FR')}`, 14, 41)
+
+    // Right — production info block
+    const rx = 116
+    const infoRows = [
+      { label: 'Production', value: projectInfo?.productionName ?? '' },
+      { label: 'P\u00e9riode', value: period },
+      { label: 'Techniciens', value: `${totalPersons}` },
+      { label: 'D\u00e9partements', value: `${totalDepts}` },
+    ]
+    infoRows.forEach((row, i) => {
+      const y = 13 + i * 10
+      doc.setFontSize(6.5)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(...C_MUTED)
+      doc.text(row.label.toUpperCase(), rx, y)
+      doc.setFontSize(8.5)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(...C_DARK)
+      doc.text(row.value, rx, y + 4)
+    })
+
+    // Dark separator bar
+    doc.setFillColor(...C_DARK)
+    doc.rect(0, headerH, pageW, separatorH, 'F')
+    doc.setTextColor(...C_WHITE)
+    doc.setFontSize(8.5)
+    doc.setFont('helvetica', 'bold')
+    doc.text('LISTE TECHNIQUE', 14, headerH + 6.8)
   }
 
   drawPageHeader()
 
   // ── Page footer
   const drawPageFooter = (pageNum: number) => {
-    doc.setFillColor(...NAVY)
-    doc.rect(0, pageH - 9, pageW, 9, 'F')
-    doc.setTextColor(...WHITE)
+    doc.setDrawColor(...C_LIGHT)
+    doc.setLineWidth(0.3)
+    doc.line(14, pageH - 11, pageW - 14, pageH - 11)
+    doc.setTextColor(...C_MUTED)
     doc.setFontSize(7)
-    doc.text(
-      `${projectInfo?.name ?? ''} \u2014 Liste Technique \u2014 ITSI-APP`,
-      14,
-      pageH - 3,
-    )
-    doc.text(`Page ${pageNum}`, pageW - 14, pageH - 3, { align: 'right' })
+    doc.setFont('helvetica', 'normal')
+    doc.text(`${projectInfo?.name ?? ''} \u2014 Liste Technique`, 14, pageH - 6)
+    doc.text(`Page ${pageNum}`, pageW - 14, pageH - 6, { align: 'right' })
   }
 
   drawPageFooter(1)
 
-  let yPos = 53
+  let yPos = headerH + separatorH + 5
   let globalCounter = 0
   let currentPage = 1
 
   for (const [deptName, jobs] of Object.entries(data)) {
-    // ── Department header bar
-    const deptBarH = 9
-    if (yPos + deptBarH + 20 > pageH - 12) {
+    const deptBarH = 8
+    if (yPos + deptBarH + 22 > pageH - 14) {
       doc.addPage()
       currentPage++
       yPos = 10
       drawPageFooter(currentPage)
     }
 
-    doc.setFillColor(...BLUE)
+    // Department header bar
+    doc.setFillColor(...C_DARK)
     doc.rect(0, yPos, pageW, deptBarH, 'F')
-    doc.setTextColor(...WHITE)
-    doc.setFontSize(9)
-    doc.setFont('helvetica', 'bold')
-    doc.text(deptName, 14, yPos + 6)
-    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(...C_WHITE)
     doc.setFontSize(8)
+    doc.setFont('helvetica', 'bold')
+    doc.text(deptName.toUpperCase(), 14, yPos + 5.5)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7.5)
     doc.text(
       `${jobs.length} technicien${jobs.length > 1 ? 's' : ''}`,
       pageW - 14,
-      yPos + 6,
+      yPos + 5.5,
       { align: 'right' },
     )
 
-    yPos += deptBarH + 1
+    yPos += deptBarH
 
-    // ── Table rows
+    // Table rows
     const tableBody = jobs.map((job) => {
       globalCounter++
       const inter = job.project_intermittent?.intermittent
@@ -169,50 +186,41 @@ export async function generateListeTechnique(data: CrewData): Promise<void> {
         : job.project_intermittent?.name ?? ''
       const phone = inter?.mobile_number ? formatPhone(inter.mobile_number) : ''
       const email = job.project_intermittent?.email ?? ''
-      const contractRef = job.contract?.puid ?? ''
-      const category = job.contract?.job_professional_category_translated ?? ''
 
-      return [
-        globalCounter.toString(),
-        job.label,
-        name,
-        phone,
-        email,
-        category,
-        contractRef,
-      ]
+      return [globalCounter.toString(), job.label.toUpperCase(), name, phone, email]
     })
 
     autoTable(doc, {
       startY: yPos,
-      head: [
-        ['#', 'Poste', 'Nom Prénom', 'Téléphone', 'Email', 'Catégorie', 'Réf. Contrat'],
-      ],
+      head: [['#', 'POSTE', 'NOM PR\u00c9NOM', 'T\u00c9L\u00c9PHONE', 'EMAIL']],
       body: tableBody,
       theme: 'grid',
       headStyles: {
-        fillColor: NAVY,
-        textColor: WHITE,
-        fontSize: 7.5,
+        fillColor: C_LIGHT,
+        textColor: C_MUTED,
+        fontSize: 7,
         fontStyle: 'bold',
-        cellPadding: { top: 2, bottom: 2, left: 3, right: 3 },
+        cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 },
+        lineColor: C_LIGHT,
+        lineWidth: 0.25,
       },
       bodyStyles: {
         fontSize: 7.5,
-        cellPadding: { top: 2, bottom: 2, left: 3, right: 3 },
-        textColor: DARK,
+        cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 },
+        textColor: C_DARK,
+        fillColor: C_WHITE,
+        lineColor: C_LIGHT,
+        lineWidth: 0.25,
       },
-      alternateRowStyles: { fillColor: LIGHT_BLUE },
+      alternateRowStyles: { fillColor: C_WHITE },
       columnStyles: {
-        0: { cellWidth: 8, halign: 'center' },
-        1: { cellWidth: 52 },
-        2: { cellWidth: 36 },
-        3: { cellWidth: 24 },
-        4: { cellWidth: 40 },
-        5: { cellWidth: 18, halign: 'center' },
-        6: { cellWidth: 'auto' },
+        0: { cellWidth: 8, halign: 'center', textColor: C_MUTED },
+        1: { cellWidth: 55, textColor: C_MUTED },
+        2: { cellWidth: 42 },
+        3: { cellWidth: 28 },
+        4: { cellWidth: 'auto' },
       },
-      margin: { left: 14, right: 14, bottom: 12 },
+      margin: { left: 14, right: 14, bottom: 14 },
       didDrawPage: (hookData) => {
         const pg = hookData.pageNumber ?? doc.getCurrentPageInfo().pageNumber
         if (pg > currentPage) {
@@ -222,106 +230,120 @@ export async function generateListeTechnique(data: CrewData): Promise<void> {
       },
     })
 
-    yPos = (doc as any).lastAutoTable.finalY + 8
+    yPos = (doc as any).lastAutoTable.finalY + 6
   }
 
   doc.save(`liste-technique-${projectInfo?.slug ?? 'projet'}.pdf`)
 }
 
-// ─── Feuille de Service ─────────────────────────────────────────────────────
+// ─── Feuille de Service ──────────────────────────────────────────────────────
 
 export async function generateFeuilleDeService(data: CrewData): Promise<void> {
   const { default: jsPDF } = await import('jspdf')
   const { default: autoTable } = await import('jspdf-autotable')
 
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
-  const pageW = doc.internal.pageSize.getWidth()
-  const pageH = doc.internal.pageSize.getHeight()
+  const pageW = doc.internal.pageSize.getWidth()   // 297
+  const pageH = doc.internal.pageSize.getHeight()  // 210
 
   const projectInfo = getProjectInfo(data)
   const totalPersons = Object.values(data).reduce((s, j) => s + j.length, 0)
+  const totalDepts = Object.keys(data).length
+  const period = projectInfo
+    ? `${formatDate(projectInfo.startDate)} \u2192 ${formatDate(projectInfo.endDate)}`
+    : ''
 
-  // ── Page header
+  const headerH = 42
+  const separatorH = 10
+
   const drawPageHeader = () => {
-    doc.setFillColor(...NAVY)
-    doc.rect(0, 0, pageW, 40, 'F')
+    doc.setFillColor(...C_LIGHT)
+    doc.rect(0, 0, pageW, headerH, 'F')
 
-    doc.setTextColor(...WHITE)
-    doc.setFontSize(18)
+    doc.setTextColor(...C_DARK)
+    doc.setFontSize(26)
     doc.setFont('helvetica', 'bold')
-    doc.text('FEUILLE DE SERVICE', 14, 15)
+    doc.text('CREW LIST', 14, 18)
 
-    doc.setFontSize(12)
+    doc.setFontSize(10.5)
     doc.setFont('helvetica', 'normal')
-    doc.text(projectInfo?.name ?? '', 14, 25)
+    doc.setTextColor(...C_MUTED)
+    doc.text(projectInfo?.name ?? '', 14, 27)
 
-    doc.setFontSize(8)
-    const period =
-      projectInfo
-        ? `${formatDate(projectInfo.startDate)} \u2192 ${formatDate(projectInfo.endDate)}`
-        : ''
-    doc.text(
-      `Production\u00a0: ${projectInfo?.productionName}   \u2022   P\u00e9riode\u00a0: ${period}   \u2022   ${totalPersons} techniciens`,
-      14,
-      33,
-    )
-    doc.text(
-      `G\u00e9n\u00e9r\u00e9 le ${new Date().toLocaleDateString('fr-FR')}`,
-      pageW - 14,
-      33,
-      { align: 'right' },
-    )
+    doc.setFontSize(7.5)
+    doc.text(`G\u00e9n\u00e9r\u00e9 le ${new Date().toLocaleDateString('fr-FR')}`, 14, 35)
+
+    const rx = 210
+    const infoRows = [
+      { label: 'Production', value: projectInfo?.productionName ?? '' },
+      { label: 'P\u00e9riode', value: period },
+      { label: 'Techniciens', value: `${totalPersons}` },
+      { label: 'D\u00e9partements', value: `${totalDepts}` },
+    ]
+    infoRows.forEach((row, i) => {
+      const y = 9 + i * 9
+      doc.setFontSize(6.5)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(...C_MUTED)
+      doc.text(row.label.toUpperCase(), rx, y)
+      doc.setFontSize(8.5)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(...C_DARK)
+      doc.text(row.value, rx, y + 4)
+    })
+
+    doc.setFillColor(...C_DARK)
+    doc.rect(0, headerH, pageW, separatorH, 'F')
+    doc.setTextColor(...C_WHITE)
+    doc.setFontSize(8.5)
+    doc.setFont('helvetica', 'bold')
+    doc.text('FEUILLE DE SERVICE', 14, headerH + 6.8)
   }
 
   drawPageHeader()
 
-  // ── Page footer
   const drawPageFooter = (pageNum: number) => {
-    doc.setFillColor(...NAVY)
-    doc.rect(0, pageH - 9, pageW, 9, 'F')
-    doc.setTextColor(...WHITE)
+    doc.setDrawColor(...C_LIGHT)
+    doc.setLineWidth(0.3)
+    doc.line(10, pageH - 11, pageW - 10, pageH - 11)
+    doc.setTextColor(...C_MUTED)
     doc.setFontSize(7)
-    doc.text(
-      `${projectInfo?.name ?? ''} \u2014 Feuille de Service \u2014 ITSI-APP`,
-      14,
-      pageH - 3,
-    )
-    doc.text(`Page ${pageNum}`, pageW - 14, pageH - 3, { align: 'right' })
+    doc.setFont('helvetica', 'normal')
+    doc.text(`${projectInfo?.name ?? ''} \u2014 Feuille de Service`, 10, pageH - 6)
+    doc.text(`Page ${pageNum}`, pageW - 10, pageH - 6, { align: 'right' })
   }
 
   drawPageFooter(1)
 
-  let yPos = 48
+  let yPos = headerH + separatorH + 5
   let currentPage = 1
 
   for (const [deptName, jobs] of Object.entries(data)) {
-    const deptBarH = 9
-    if (yPos + deptBarH + 20 > pageH - 12) {
+    const deptBarH = 8
+    if (yPos + deptBarH + 22 > pageH - 14) {
       doc.addPage()
       currentPage++
       yPos = 10
       drawPageFooter(currentPage)
     }
 
-    // ── Department header bar
-    doc.setFillColor(...GREEN)
+    doc.setFillColor(...C_DARK)
     doc.rect(0, yPos, pageW, deptBarH, 'F')
-    doc.setTextColor(...WHITE)
-    doc.setFontSize(9)
-    doc.setFont('helvetica', 'bold')
-    doc.text(deptName, 14, yPos + 6)
-    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(...C_WHITE)
     doc.setFontSize(8)
+    doc.setFont('helvetica', 'bold')
+    doc.text(deptName.toUpperCase(), 14, yPos + 5.5)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7.5)
     doc.text(
       `${jobs.length} technicien${jobs.length > 1 ? 's' : ''}`,
       pageW - 14,
-      yPos + 6,
+      yPos + 5.5,
       { align: 'right' },
     )
 
-    yPos += deptBarH + 1
+    yPos += deptBarH
 
-    // ── Table rows
     const tableBody = jobs.map((job) => {
       const inter = job.project_intermittent?.intermittent
       const name = inter
@@ -344,7 +366,7 @@ export async function generateFeuilleDeService(data: CrewData): Promise<void> {
       const extraSlices = contract?.remuneration_extra_slices ?? {}
       const extraLines = Object.entries(extraSlices)
         .filter(([, v]) => v.quantity > 0)
-        .map(([k, v]) => `${k}: ${v.quantity / 60}h`)
+        .map(([k, v]) => `${k}\u00a0: ${v.quantity / 60}h`)
         .join(' | ')
 
       return [
@@ -358,7 +380,7 @@ export async function generateFeuilleDeService(data: CrewData): Promise<void> {
         contract?.remuneration_total ?? '',
         job.project_intermittent?.total_hours ?? '',
         totalPrice,
-        extraLines || '—',
+        extraLines || '\u2014',
         contract?.puid ?? '',
         contract?.status_translated ?? '',
       ]
@@ -368,41 +390,46 @@ export async function generateFeuilleDeService(data: CrewData): Promise<void> {
       startY: yPos,
       head: [
         [
-          'Nom Prénom',
+          'Nom Pr\u00e9nom',
           'Poste',
-          'Catégorie',
-          'Période contrat',
+          'Cat\u00e9gorie',
+          'P\u00e9riode contrat',
           'Type',
           'H/sem',
           'Taux horaire',
           'Salaire hebdo',
           'Total heures',
-          'Coût total',
+          'Co\u00fbt total',
           'Heures supp.',
-          'Réf. Contrat',
+          'R\u00e9f. Contrat',
           'Statut',
         ],
       ],
       body: tableBody,
       theme: 'grid',
       headStyles: {
-        fillColor: NAVY,
-        textColor: WHITE,
-        fontSize: 7,
+        fillColor: C_LIGHT,
+        textColor: C_MUTED,
+        fontSize: 6.5,
         fontStyle: 'bold',
         cellPadding: { top: 2, bottom: 2, left: 2, right: 2 },
+        lineColor: C_LIGHT,
+        lineWidth: 0.25,
       },
       bodyStyles: {
         fontSize: 7,
         cellPadding: { top: 2, bottom: 2, left: 2, right: 2 },
-        textColor: DARK,
+        textColor: C_DARK,
+        fillColor: C_WHITE,
+        lineColor: C_LIGHT,
+        lineWidth: 0.25,
       },
-      alternateRowStyles: { fillColor: LIGHT_GREEN },
+      alternateRowStyles: { fillColor: C_WHITE },
       columnStyles: {
-        0: { cellWidth: 30 },
-        1: { cellWidth: 50 },
-        2: { cellWidth: 18, halign: 'center' },
-        3: { cellWidth: 32 },
+        0: { cellWidth: 28 },
+        1: { cellWidth: 38, textColor: C_MUTED },
+        2: { cellWidth: 14, halign: 'center' },
+        3: { cellWidth: 28 },
         4: { cellWidth: 18 },
         5: { cellWidth: 11, halign: 'center' },
         6: { cellWidth: 18, halign: 'right' },
@@ -413,7 +440,7 @@ export async function generateFeuilleDeService(data: CrewData): Promise<void> {
         11: { cellWidth: 25 },
         12: { cellWidth: 'auto', halign: 'center' },
       },
-      margin: { left: 10, right: 10, bottom: 12 },
+      margin: { left: 10, right: 10, bottom: 14 },
       didDrawPage: (hookData) => {
         const pg = hookData.pageNumber ?? doc.getCurrentPageInfo().pageNumber
         if (pg > currentPage) {
@@ -423,7 +450,7 @@ export async function generateFeuilleDeService(data: CrewData): Promise<void> {
       },
     })
 
-    yPos = (doc as any).lastAutoTable.finalY + 8
+    yPos = (doc as any).lastAutoTable.finalY + 6
   }
 
   doc.save(`feuille-de-service-${projectInfo?.slug ?? 'projet'}.pdf`)
