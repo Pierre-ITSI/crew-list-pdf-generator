@@ -44,6 +44,7 @@ export interface ProjectIntermittent {
   total_hours: string
   total_days: number
   total_price: number
+  project?: Project
 }
 
 export interface Project {
