@@ -109,3 +109,19 @@ export interface ProjectJob {
 }
 
 export type CrewData = Record<string, ProjectJob[]>
+
+export interface InfoRowOverride {
+  col0?: string   // Fonction
+  col1?: string   // Nom
+  col2?: string   // Mobile
+  col3?: string   // Email
+}
+
+export interface ListeOverrides {
+  productionName?: string      // overrides JSON value in header + info block
+  filmName?: string            // overrides JSON value in header
+  studioDecor?: string         // extra meta row (empty by default)
+  clientRow?: InfoRowOverride
+  agenceRow?: InfoRowOverride
+  producteurRow?: InfoRowOverride  // col0 = "Producteur" is fixed
+}

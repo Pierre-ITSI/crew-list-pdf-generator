@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef } from 'react'
 import { generateListeTechnique, generateFeuilleDeService } from '../lib/pdfGenerators'
-import type { CrewData } from '../lib/types'
+import type { CrewData, ListeOverrides } from '../lib/types'
 import { CrewPreview } from '../components/CrewPreview'
 
 type DocType = 'liste_technique' | 'feuille_de_service'
@@ -25,13 +25,18 @@ const DOC_TYPES: { id: DocType; label: string; desc: string; emoji: string; colo
 ]
 
 export default function Home() {
-  const [crewData, setCrewData]       = useState<CrewData | null>(null)
-  const [docType, setDocType]         = useState<DocType>('liste_technique')
-  const [isDragging, setIsDragging]   = useState(false)
-  const [fileName, setFileName]       = useState('')
-  const [error, setError]             = useState('')
+  const [crewData, setCrewData]         = useState<CrewData | null>(null)
+  const [overrides, setOverrides]       = useState<ListeOverrides>({})
+  const [docType, setDocType]           = useState<DocType>('liste_technique')
+  const [isDragging, setIsDragging]     = useState(false)
+  const [fileName, setFileName]         = useState('')
+  const [error, setError]               = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleOverride = useCallback((patch: Partial<ListeOverrides>) => {
+    setOverrides(prev => ({ ...prev, ...patch }))
+  }, [])
 
   const processFile = useCallback((file: File) => {
     if (!file.name.endsWith('.json')) {
@@ -43,6 +48,7 @@ export default function Home() {
       try {
         const parsed = JSON.parse(e.target?.result as string) as CrewData
         setCrewData(parsed)
+        setOverrides({})
         setFileName(file.name)
         setError('')
       } catch {
@@ -73,7 +79,7 @@ export default function Home() {
     setError('')
     try {
       if (docType === 'liste_technique') {
-        await generateListeTechnique(crewData)
+        await generateListeTechnique(crewData, overrides)
       } else {
         await generateFeuilleDeService(crewData)
       }
@@ -278,7 +284,7 @@ export default function Home() {
                 </div>
               </div>
               <div className="p-5 overflow-y-auto" style={{ maxHeight: '75vh' }}>
-                <CrewPreview data={crewData} />
+                <CrewPreview data={crewData} overrides={overrides} onOverride={handleOverride} />
               </div>
             </div>
           )}

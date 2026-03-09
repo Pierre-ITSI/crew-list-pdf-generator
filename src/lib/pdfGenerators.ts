@@ -1,4 +1,4 @@
-import type { CrewData, ProjectJob } from './types'
+import type { CrewData, ProjectJob, ListeOverrides } from './types'
 
 // ─── Palette — Liste Technique ────────────────────────────────────────────────
 const C_DARK:   [number, number, number] = [45,  43,  72 ]  // #2D2B48
@@ -71,7 +71,7 @@ const getProjectInfo = (data: CrewData) => {
 
 // ─── Liste Technique ─────────────────────────────────────────────────────────
 
-export async function generateListeTechnique(data: CrewData): Promise<void> {
+export async function generateListeTechnique(data: CrewData, overrides?: ListeOverrides): Promise<void> {
   const { default: jsPDF } = await import('jspdf')
 
   const doc  = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
@@ -102,6 +102,10 @@ export async function generateListeTechnique(data: CrewData): Promise<void> {
   const period = pi
     ? `${formatDate(pi.startDate)} \u2192 ${formatDate(pi.endDate)}`
     : ''
+
+  // Effective values — overrides take precedence over JSON data
+  const effectiveProd = overrides?.productionName ?? pi?.productionName ?? '\u2014'
+  const effectiveFilm = overrides?.filmName        ?? pi?.name           ?? '\u2014'
 
   let y    = ML
   let page = 1
@@ -191,8 +195,19 @@ export async function generateListeTechnique(data: CrewData): Promise<void> {
   }
 
   // ── HEADER — 2 cards side by side ────────────────────────────────────────
-  const CARD_H = 26
-  const CARD_W = (IW - GAP) / 2  // ≈ 93.75 mm
+  const metaRows = [
+    { lbl: 'PRODUCTION',     val: effectiveProd         },
+    { lbl: 'FILM',           val: effectiveFilm         },
+    { lbl: 'DATES TOURNAGE', val: period || '\u2014'    },
+    ...(overrides?.studioDecor
+      ? [{ lbl: 'STUDIO / D\u00c9COR', val: overrides.studioDecor }]
+      : []
+    ),
+  ]
+  const CARD_H     = metaRows.length <= 3 ? 26 : 32
+  const rowStartY  = metaRows.length <= 3 ?  5 :  4
+  const rowSpacing = metaRows.length <= 3 ?  7 :  6.5
+  const CARD_W     = (IW - GAP) / 2  // ≈ 93.75 mm
 
   // Left card — CREW LIST
   doc.setFillColor(...C_CARD)
@@ -206,13 +221,8 @@ export async function generateListeTechnique(data: CrewData): Promise<void> {
   const cardRx = ML + CARD_W + GAP
   doc.setFillColor(...C_CARD)
   doc.roundedRect(cardRx, y, CARD_W, CARD_H, R, R, 'F')
-  const metaRows = [
-    { lbl: 'PRODUCTION',     val: pi?.productionName ?? '\u2014' },
-    { lbl: 'FILM',           val: pi?.name           ?? '\u2014' },
-    { lbl: 'DATES TOURNAGE', val: period             || '\u2014' },
-  ]
   metaRows.forEach(({ lbl, val }, i) => {
-    const my = y + 5 + i * 7
+    const my = y + rowStartY + i * rowSpacing
     doc.setFontSize(5.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C_MUTED)
     doc.text(lbl, cardRx + 3, my)
     doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(...C_TEXT)
@@ -226,14 +236,16 @@ export async function generateListeTechnique(data: CrewData): Promise<void> {
     | { type: 'lbl'; text: string; roundTop: boolean }
     | { type: 'row'; cells: [string, string, string, string] }
 
+  const o = overrides
+  const dash = '\u2014'
   const infoItems: InfoItem[] = [
     { type: 'lbl', text: 'CLIENT',     roundTop: true  },
-    { type: 'row', cells: ['\u2014', '\u2014', '\u2014', '\u2014'] },
+    { type: 'row', cells: [o?.clientRow?.col0 || dash, o?.clientRow?.col1 || dash, o?.clientRow?.col2 || dash, o?.clientRow?.col3 || dash] },
     { type: 'lbl', text: 'AGENCE',     roundTop: false },
-    { type: 'row', cells: ['\u2014', '\u2014', '\u2014', '\u2014'] },
+    { type: 'row', cells: [o?.agenceRow?.col0 || dash, o?.agenceRow?.col1 || dash, o?.agenceRow?.col2 || dash, o?.agenceRow?.col3 || dash] },
     { type: 'lbl', text: 'PRODUCTION', roundTop: false },
-    { type: 'row', cells: [pi?.productionName ?? '\u2014', '', '', ''] },
-    { type: 'row', cells: ['Producteur', '\u2014', '\u2014', '\u2014'] },
+    { type: 'row', cells: [effectiveProd, '', '', ''] },
+    { type: 'row', cells: ['Producteur', o?.producteurRow?.col1 || dash, o?.producteurRow?.col2 || dash, o?.producteurRow?.col3 || dash] },
   ]
 
   const infoH = infoItems.reduce(
