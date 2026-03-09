@@ -110,18 +110,40 @@ export interface ProjectJob {
 
 export type CrewData = Record<string, ProjectJob[]>
 
-export interface InfoRowOverride {
+export type InfoSectionType =
+  | 'agence'
+  | 'client'
+  | 'production_executive'
+  | 'production_delegue'
+  | 'realisateur'
+  | 'agent_realisateur'
+  | 'agent_chef_operateur'
+
+export interface InfoSectionRow {
   col0?: string   // Fonction
   col1?: string   // Nom
   col2?: string   // Mobile
   col3?: string   // Email
 }
 
+export interface InfoSection {
+  type: InfoSectionType
+  rows: InfoSectionRow[]
+}
+
+export interface CrewRowOverride {
+  label?: string
+  name?:  string
+  phone?: string
+  email?: string
+}
+
 export interface ListeOverrides {
-  productionName?: string      // overrides JSON value in header + info block
-  filmName?: string            // overrides JSON value in header
-  studioDecor?: string         // extra meta row (empty by default)
-  clientRow?: InfoRowOverride
-  agenceRow?: InfoRowOverride
-  producteurRow?: InfoRowOverride  // col0 = "Producteur" is fixed
+  productionName?: string   // overrides JSON value in header + info block
+  filmName?: string         // overrides JSON value in header
+  studioDecor?: string      // extra meta row in header card
+  sections?: InfoSection[]  // dynamic info-block sections (ordered)
+  producteurRow?: InfoSectionRow  // editable row in the fixed PRODUCTION section
+  // crew row overrides: key = "deptName::rowIndex"
+  crewRows?: Record<string, CrewRowOverride>
 }

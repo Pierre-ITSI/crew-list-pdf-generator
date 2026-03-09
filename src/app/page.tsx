@@ -2,8 +2,8 @@
 
 import { useState, useCallback, useRef } from 'react'
 import { generateListeTechnique, generateFeuilleDeService } from '../lib/pdfGenerators'
-import type { CrewData, ListeOverrides } from '../lib/types'
-import { CrewPreview } from '../components/CrewPreview'
+import type { CrewData, ListeOverrides, InfoSectionType } from '../lib/types'
+import { CrewPreview, SECTION_CONFIG } from '../components/CrewPreview'
 
 type DocType = 'liste_technique' | 'feuille_de_service'
 
@@ -206,6 +206,43 @@ export default function Home() {
                   </div>
                 )}
               </div>
+
+              {/* Section toggles */}
+              {crewData && (
+                <div className="px-6 pb-4 border-t border-slate-50 pt-4">
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">
+                    Sections info
+                  </p>
+                  <div className="flex flex-col gap-1">
+                    {(Object.entries(SECTION_CONFIG) as [InfoSectionType, { label: string; multi: boolean }][]).map(([type, cfg]) => {
+                      const isActive = overrides.sections?.some(s => s.type === type) ?? false
+                      return (
+                        <button
+                          key={type}
+                          onClick={() => {
+                            if (isActive) {
+                              handleOverride({ sections: (overrides.sections ?? []).filter(s => s.type !== type) })
+                            } else {
+                              handleOverride({ sections: [...(overrides.sections ?? []), { type, rows: [{}] }] })
+                            }
+                          }}
+                          className={[
+                            'flex items-center justify-between px-3 py-1.5 rounded-xl text-xs text-left transition-all duration-150',
+                            isActive
+                              ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                              : 'bg-slate-50 text-slate-500 border border-slate-100 hover:border-slate-200',
+                          ].join(' ')}
+                        >
+                          <span className="font-medium">{cfg.label}</span>
+                          <span className={`text-sm font-bold ${isActive ? 'text-indigo-400' : 'text-slate-300'}`}>
+                            {isActive ? '×' : '+'}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Document type selector + generate */}
               {crewData && (

@@ -236,17 +236,34 @@ export async function generateListeTechnique(data: CrewData, overrides?: ListeOv
     | { type: 'lbl'; text: string; roundTop: boolean }
     | { type: 'row'; cells: [string, string, string, string] }
 
+  const SECTION_LABELS: Record<string, string> = {
+    agence:               'AGENCE',
+    client:               'CLIENT',
+    production_executive: 'PRODUCTION EXECUTIVE',
+    production_delegue:   'PRODUCTION D\u00c9L\u00c9GU\u00c9E',
+    realisateur:          'R\u00c9ALISATEUR',
+    agent_realisateur:    'AGENT R\u00c9ALISATEUR',
+    agent_chef_operateur: 'AGENT CHEF OP\u00c9RATEUR',
+  }
+
   const o = overrides
   const dash = '\u2014'
-  const infoItems: InfoItem[] = [
-    { type: 'lbl', text: 'CLIENT',     roundTop: true  },
-    { type: 'row', cells: [o?.clientRow?.col0 || dash, o?.clientRow?.col1 || dash, o?.clientRow?.col2 || dash, o?.clientRow?.col3 || dash] },
-    { type: 'lbl', text: 'AGENCE',     roundTop: false },
-    { type: 'row', cells: [o?.agenceRow?.col0 || dash, o?.agenceRow?.col1 || dash, o?.agenceRow?.col2 || dash, o?.agenceRow?.col3 || dash] },
-    { type: 'lbl', text: 'PRODUCTION', roundTop: false },
-    { type: 'row', cells: [effectiveProd, '', '', ''] },
-    { type: 'row', cells: ['Producteur', o?.producteurRow?.col1 || dash, o?.producteurRow?.col2 || dash, o?.producteurRow?.col3 || dash] },
-  ]
+  const activeSections = o?.sections ?? []
+
+  const infoItems: InfoItem[] = []
+
+  // Dynamic sections
+  activeSections.forEach((section, si) => {
+    infoItems.push({ type: 'lbl', text: SECTION_LABELS[section.type] ?? section.type.toUpperCase(), roundTop: si === 0 })
+    section.rows.forEach(row => {
+      infoItems.push({ type: 'row', cells: [row.col0 || dash, row.col1 || dash, row.col2 || dash, row.col3 || dash] })
+    })
+  })
+
+  // Fixed PRODUCTION section
+  infoItems.push({ type: 'lbl', text: 'PRODUCTION', roundTop: activeSections.length === 0 })
+  infoItems.push({ type: 'row', cells: [effectiveProd, '', '', ''] })
+  infoItems.push({ type: 'row', cells: ['Producteur', o?.producteurRow?.col1 || dash, o?.producteurRow?.col2 || dash, o?.producteurRow?.col3 || dash] })
 
   const infoH = infoItems.reduce(
     (acc, item) => acc + (item.type === 'lbl' ? LBL_H : ROW_H),
@@ -303,14 +320,16 @@ export async function generateListeTechnique(data: CrewData, overrides?: ListeOv
 
     // Content rows — no horizontal borders, alternating bg
     jobs.forEach((job, idx) => {
-      const inter = job.project_intermittent?.intermittent
-      const name  = inter
-        ? `${inter.firstname} ${inter.lastname}`
-        : job.project_intermittent?.name ?? '\u2014'
-      const phone = inter?.mobile_number ? formatPhone(inter.mobile_number) : '\u2014'
-      const email = job.project_intermittent?.email ?? inter?.email ?? '\u2014'
+      const inter  = job.project_intermittent?.intermittent
+      const rowKey = `${deptName}::${idx}`
+      const ov     = overrides?.crewRows?.[rowKey] ?? {}
 
-      contentRow(y, [job.label, name, phone, email], idx % 2 === 1)
+      const name  = ov.name  ?? (inter ? `${inter.firstname} ${inter.lastname}` : job.project_intermittent?.name ?? '\u2014')
+      const phone = ov.phone ?? (inter?.mobile_number ? formatPhone(inter.mobile_number) : '\u2014')
+      const email = ov.email ?? (job.project_intermittent?.email ?? inter?.email ?? '\u2014')
+      const label = ov.label ?? job.label
+
+      contentRow(y, [label, name, phone, email], idx % 2 === 1)
       y += ROW_H
     })
 
