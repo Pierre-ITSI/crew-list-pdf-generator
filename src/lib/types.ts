@@ -60,6 +60,8 @@ export interface Project {
   payment_period?: string
   social_contributions_rate?: number
   insurance_rate?: number
+  pseudo_siret?: string | null
+  pole_emploi_object_number?: string | null
 }
 
 export interface ExtraSlice {
